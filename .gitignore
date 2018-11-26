@@ -1,0 +1,32 @@
+datasets/*
+eval_gen-master
+*.csv
+*.pyc
+*.out
+/#*
+outputs*
+model_output*
+
+# Compiled latex #
+###################
+*.aux
+*.log
+*.gz
+*.blg
+*.bbl
+*.toc
+*.top
+*.tui
+*.out
+*eps-converted-to.pdf
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+*~
+
+# Exclude pdf versions of latex documents #
+##########################################
+*.pdf
