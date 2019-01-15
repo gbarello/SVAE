@@ -6,6 +6,7 @@ eval_gen-master
 /#*
 outputs*
 model_output*
+.ipynb_checkpoints
 
 # Compiled latex #
 ###################
@@ -30,3 +31,4 @@ model_output*
 # Exclude pdf versions of latex documents #
 ##########################################
 *.pdf
+

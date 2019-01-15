@@ -1,0 +1,3 @@
+[submodule "my_modules"]
+	path = my_modules
+	url = git@github.com:gbarello/my_modules.git

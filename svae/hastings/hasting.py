@@ -70,7 +70,7 @@ def AIS(f1,f2,f1sam,shape,n_samp,n_AIS_step,nhstep,eps = .1,grad = -1,L = 10,PRI
     F = []
 
     for k in range(1,len(beta)):
-
+        print(k)
         if PRINT:
             print(k)
 
@@ -115,6 +115,11 @@ if __name__ == "__main__":
         return  - (x-5)/(.25**2)
 
     N = 100
+    nsamp = 500
+    n_AIS_step = 50
+    nhstep = 3
+    eps = .1
+    L = 100
 
     fa = lambda x: -prior(x,N)
     fb = lambda x: -poste(x,N)# + prior(x,N)
@@ -124,12 +129,12 @@ if __name__ == "__main__":
 
     norm = lambda x: -true_norm(x,N)# + prior(x,N)
 
-    nstep = 10000
-    AISstep = 100
-
     #f1,f2,f1sam,shape,n_samp,n_AIS_step,nhstep,eps = .1,grad = -1,L = 10)
-
-    XO,W = AIS(fa,fb,lambda n:np.random.laplace(0,1,[n[0],n[1]]),N,n_samp = 500,n_AIS_step = 100,nhstep = 3,eps = .1,grad = [ga,gb],L = 100,PRINT = True)
+    import time
+    t1 = time.time()
+    XO,W = AIS(fa,fb,lambda n:np.random.laplace(0,1,[n[0],n[1]]),N,n_samp = nsamp,n_AIS_step = n_AIS_step,nhstep = nhstep,eps = eps,grad = [ga,gb],L = L,PRINT = True)
+    t2 = time.time()
+    print("time: {}".format(t2 - t1))
     print("AIS norm",np.mean(W))
     print("true norm",norm(1))
         

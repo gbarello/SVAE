@@ -103,7 +103,7 @@ def run_training_loop(data,vdata,input_tensor,batch_size,train_op,loss_op,recerr
 
     
 
-def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,n_grad_step,loss_type,n_gauss_dim,n_lat_samp,seed,param_save_freq,log_freq,sigma,s1,s2,S,device,PCA_truncation):
+def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,n_grad_step,loss_type,n_gauss_dim,n_lat_samp,seed,param_save_freq,log_freq,sigma,s1,s2,S,device,PCA_truncation,dataset):
 
     os.environ["CUDA_VISIBLE_DEVICES"]=str(device)
     np.random.seed(seed)
@@ -111,11 +111,12 @@ def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,n_grad_step,loss_
     dirname = util.get_directory(direc="./model_output/",tag = loss_type + "_{}".format(n_gauss_dim))
 
     params = {
+        "dataset":dataset,
         "patch_size":patch_size,
         "n_batch":n_batch,
         "pca_frac":pca_frac,
         "overcomplete":overcomplete,
-        "learning_rate":learning_rate,
+        "learning_rate":np.float32(learning_rate),
         "pca_truncation":PCA_truncation,
         "n_grad_step":n_grad_step,
         "loss_type":loss_type,
@@ -124,9 +125,9 @@ def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,n_grad_step,loss_
         "sigma":np.float32(sigma),
         "param_save_freq":param_save_freq,
         "log_freq":log_freq,
-        "s1":s1,
-        "s2":s2,
-        "S":S
+        "s1":np.float32(s1),
+        "s2":np.float32(s2),
+        "S":np.float32(S)
     }
     
     util.dump_file(dirname +"/model_params",params)
@@ -150,7 +151,7 @@ def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,n_grad_step,loss_
 
     run_training_loop(data,varif,images,n_batch,train,loss_exp,recon_err,LOG,dirname,log_freq,n_grad_step,param_save_freq)
 
-def prepare_network(params):
+def prepare_network(params,old = False):
     
     patch_size = params["patch_size"]
     n_batch = params["n_batch"]
@@ -174,27 +175,35 @@ def prepare_network(params):
     if params["pca_truncation"] == "cut":
         n_pca = int((params["patch_size"] ** 2)*params["pca_frac"])
 
-        data,varif,test,PCA = dat.get_data(patch_size,n_pca,"BSDS",True)
+        if old:
+            data,varif,test,PCA = dat.get_data(patch_size,n_pca,"BSDS",True)
+        else:
+            data,varif,test,PCA = dat.get_data(patch_size,n_pca,params["dataset"],True)
 
         n_lat = int(n_pca * params["overcomplete"])
         
     elif params["pca_truncation"] == "smooth":
         n_pca = int((params["patch_size"] ** 2))
 
-        data,varif,test,PCA = dat.get_data(patch_size,n_pca,"BSDS",False)
+        if old:
+            data,varif,test,PCA = dat.get_data(patch_size,n_pca,"BSDS",False)
+            dataw,varifw,testw,PCAw = dat.get_data(patch_size,n_pca,params["dataset"],True)
+        else:
+            data,varif,test,PCA = dat.get_data(patch_size,n_pca,params["dataset"],False)
+            dataw,varifw,testw,PCAw = dat.get_data(patch_size,n_pca,params["dataset"],True)
         
         freq = np.linspace(0,1,data.shape[1])
         fc = 1./params["overcomplete"]
         
         n_lat = int(n_pca)
 
-        mask = np.array([np.exp(-((freq/fc)**10))])
+        mask = np.array([np.exp(-((freq/fc)**4))])
 
         ev = np.sqrt(np.array([PCA.explained_variance_]))
         
-        data = data*mask/ev
-        varif = varif*mask/ev
-        test = test*mask/ev
+        data = dataw*mask
+        varif = varifw*mask
+        test = testw*mask
         
         data = PCA.inverse_transform(data)
         varif = PCA.inverse_transform(test)
@@ -210,7 +219,7 @@ def prepare_network(params):
     
     images = tf.placeholder(tf.float32,[n_batch,n_pca])
     
-    lat_mean, lat_trans, lat_cor = enc.make_encoder(images,n_lat,n_gauss_dim)
+    lat_mean, lat_trans, lat_cor = enc.make_encoder(images,n_lat,n_gauss_dim,old = old)
 
     noise1 = tf.random_normal(shape = [int(lat_mean.shape[0]),n_lat_samp,1,int(lat_mean.shape[1])])
     noise2 = tf.random_normal(shape = [int(lat_mean.shape[0]),n_lat_samp,1,int(lat_mean.shape[1])])
@@ -234,6 +243,7 @@ def prepare_network(params):
     loss_exp, recon_err = make_loss.make_loss(loss_type,images,reconstruction,lat_mean,var,latents,sigma,prior_params)
 
     return {
+        "n_lat":n_lat,
         "images":images,
         "variance":var,
         "diagonal_var":DC,
@@ -275,11 +285,12 @@ if __name__ == "__main__":
     parser.add_argument("--n_lat_samp",type = int,help = "number of samples to draw from the variational posterior during training.",default = 1)
     parser.add_argument("--seed",type = int,help = "random seed.",default=1)
 
-    parser.add_argument("--n_grad_step",type = int,help = "number of gradient descent steps to take..",default = 5000000)
-    parser.add_argument("--param_save_freq",type = int,help = "number of gradient descent steps between saving parameters.",default = 10000)
+    parser.add_argument("--n_grad_step",type = int,help = "number of gradient descent steps to take..",default = 1000000)
+    parser.add_argument("--param_save_freq",type = int,help = "number of gradient descent steps between saving parameters.",default = 50000)
     parser.add_argument("--log_freq",type = int,help = "number of gradient descent steps between log entries.",default = 100)
     parser.add_argument("--device",type = int,help = "Which GPU to use.",default = 0)
     parser.add_argument("--PCA_truncation",type = str,help = "How to truncate fourier space: 'cut' - hard cutoff in PCA eigenvalue. 'smooth' - smooth decrease in eigenvalues (default)",default = "smooth")
+    parser.add_argument("--dataset",type = str,help = "Which dataset to use (default: BSDS)",default = "BSDS")
 
                         
     args = vars(parser.parse_args())

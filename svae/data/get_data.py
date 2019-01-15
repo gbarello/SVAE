@@ -62,6 +62,7 @@ def make_synthetic_data(dist,patch_size,nvar,ndat = 100000):
     return np.dot(R,D)#[ndat,patch_size**2]
 
 def get_data(patch_size,nvar,dataset = "BSDS",whiten = True,CNN = False):
+    from scipy.ndimage.filters import gaussian_filter as gfilt
 
     try:
         F = open("./datasets/{}_{}_{}_{}".format(patch_size,nvar,dataset,whiten),"rb")
@@ -72,8 +73,10 @@ def get_data(patch_size,nvar,dataset = "BSDS",whiten = True,CNN = False):
 
     except:
         if dataset == "bruno":
-            data = np.reshape(read_dat("./../datasets/bruno_dat.csv"),[512,512,10])
+            data = np.reshape(read_dat("./datasets/bruno_dat.csv"),[512,512,10])
             data = np.transpose(data,[2,1,0])
+            
+            data = np.array([gfilt(i,.5) for i in data])
             
             data = (data + data.min())/(data.max() - data.min())
             
