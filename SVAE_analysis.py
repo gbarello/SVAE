@@ -8,7 +8,7 @@ import time
 import svae.distributions.distributions as dist
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="2"
 
 
 def main(directory):
@@ -53,7 +53,7 @@ def calc_log_likelihood(DATA,W,MP,NP,n_ais_step = 1000,n_prior_samp = 500,n_hast
     p_var = np.float32(0 * np.eye(NP["n_lat"])) + np.dot(np.transpose(A),A)/(MP["sigma"]**2)
 
     print(np.linalg.slogdet(p_var))
-    exit()
+    #exit()
 #    a = np.random.multivariate_normal(np.zeros(len(p_var)),p_var,100)
     e,v = np.linalg.eig(p_var)
     

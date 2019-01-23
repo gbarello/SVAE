@@ -1,3 +1,6 @@
 [submodule "my_modules"]
 	path = my_modules
 	url = git@github.com:gbarello/my_modules.git
+[submodule "svae/annealed_importance_sampling"]
+	path = svae/annealed_importance_sampling
+	url = git@github.com:gbarello/annealed_importance_sampling.git
