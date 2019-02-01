@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_probability as tfp
 import numpy as np
 
 PI = np.float32(np.pi)
@@ -8,6 +9,8 @@ def get_distribution(loss_type,params):
         return make_G(params)
     if loss_type == "corgauss":
         return make_CG(params)
+    if loss_type == "special_corgauss":
+        return make_special_CG(params)
     elif loss_type == "exp":
         return make_E(params)
     elif loss_type == "cauch":
@@ -24,14 +27,17 @@ def get_distribution(loss_type,params):
 
 def make_G(params):
 
+    if params == {}:
+        params = {"mean":np.float32(0),"std":np.float32(1)}
+    
     def f(latvals):
-        return -tf.reduce_sum(latvals**2,axis = -1)/2 - (int(latvals.shape[-1])/2)*np.log(2*PI)
+        return -tf.reduce_sum(((latvals - tf.expand_dims(params["mean"],0))/tf.expand_dims(params["std"],0))**2,axis = -1)/2 - (int(latvals.shape[-1])/2)*np.log(2*PI)
 
     def g(latvals):
-        return -(latvals)
+        return -(latvals - tf.expand_dims(params["mean"],0))/tf.expand_dims(params["std"],0)
 
     def dist(x,y):
-        return np.random.randn(x,y)
+        return np.random.randn(x,y)*np.expand_dims(params["std"],0) + np.expand_dims(params["mean"],0)
 
     return f,g,dist
 
@@ -46,10 +52,23 @@ def make_CG(params):
         return -tf.tensordot(lv_meansub,tf.linalg.inv(params["cov"]),axes = [[-1],[1]])
 
     def dist(x,y):
-        assert y == params["mean"].shape[0]
+        #assert y == params["mean"].shape[0]
         return np.random.multivariate_normal(params["mean"],params["cov"],x)#np.tensordot(np.random.randn(x,y),np.linalg.cholesky(params["cov"]),axes = [[1],[1]]) + params["mean"]
 
     return f,g,dist
+
+def make_special_CG(params):
+
+    def f(latvals):
+        lv_meansub = latvals - expand_tensor(params["mean"],len(latvals.shape) - len(params["mean"].shape))
+        return -tf.reduce_sum(lv_meansub*tf.tensordot(lv_meansub,tfp.math.pinv(params["cov"]),axes = [[-1],[1]]),axis = -1)/2 - (int(latvals.shape[-1])*np.log(2*PI) + tf.linalg.logdet(params["special_cov"]))/ 2
+
+    def g(latvals):
+        lv_meansub = latvals - expand_tensor(params["mean"],len(latvals.shape) - len(params["mean"].shape))
+        return -tf.tensordot(lv_meansub,tfp.math.pinv(params["cov"]),axes = [[-1],[1]])
+
+
+    return f,g,None
 
 def make_SS(params):
 

@@ -3,13 +3,15 @@ import numpy as np
 import utilities as utils
 import sys
 from run_sparse_vae import prepare_network as prep
-import svae.hastings.tf_hastings as AIS
+import svae.annealed_importance_sampling.tf_hastings as AIS
 import time
 import svae.distributions.distributions as dist
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"]="2"
+#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ["CUDA_VISIBLE_DEVICES"]= "0"
 
+EPS = 0#.00005
 
 def main(directory):
 
@@ -37,8 +39,9 @@ def main(directory):
 
     sess.close()
 
-    AISout = calc_log_likelihood(netparams["testdat"][:10],W,params,netparams)
-    
+    AISout = np.array([calc_log_likelihood(netparams["testdat"][:10],W,params,netparams,n_ais_step = nstep,eps = .2,n_hast_step = 10,n_ham_step = 3) for nstep in range(10000,20000,1000)])
+
+    np.savetxt(directory + "/AIS_loglikelihood.csv",AISout)
     
 def read_ckpt_file(f):
     F = open(f,"r")
@@ -47,13 +50,11 @@ def read_ckpt_file(f):
         CP.append(l.split(":")[-1].split('"')[1])
     return CP
 
-def calc_log_likelihood(DATA,W,MP,NP,n_ais_step = 1000,n_prior_samp = 500,n_hast_step = 5,eps = .1,n_ham_step = 10,use_prior = False):
+def calc_log_likelihood(DATA,W,MP,NP,n_ais_step = 10000,n_prior_samp = 50,n_hast_step = 5,eps = .01,n_ham_step = 10,use_prior = False):
 
     A = W
-    p_var = np.float32(0 * np.eye(NP["n_lat"])) + np.dot(np.transpose(A),A)/(MP["sigma"]**2)
-
-    print(np.linalg.slogdet(p_var))
-    #exit()
+    p_var = np.float32(EPS * np.eye(NP["n_lat"])) + np.dot(np.transpose(A),A)/(MP["sigma"]**2)
+    
 #    a = np.random.multivariate_normal(np.zeros(len(p_var)),p_var,100)
     e,v = np.linalg.eig(p_var)
     
@@ -72,9 +73,10 @@ def calc_log_likelihood(DATA,W,MP,NP,n_ais_step = 1000,n_prior_samp = 500,n_hast
         d = DATA[k]
 
         D1_f,D1_g,D1_samp = dist.get_distribution(MP["loss_type"],params = {})
-        prior_f,prior_g,prior_samp = dist.get_distribution(MP["loss_type"],params = MP)
+        #D1_f,D1_g,D1_samp = dist.get_distribution("gauss",params = {})
+        prior_f,prior_g,prior_samp = dist.get_distribution(MP["loss_type"],params = MP)        
         
-        post_g_f,post_g_g,post_g_samp = dist.get_distribution("corgauss",params = {"cov":p_var,"mean":p_mean(d)})
+        post_g_f,post_g_g,post_g_samp = dist.get_distribution("special_corgauss",params = {"cov":p_var,"mean":p_mean(d),"special_cov":np.float32(np.eye(len(p_var))*MP["sigma"]**2)})
 
         latvals = tf.placeholder(tf.float32,[n_prior_samp,NP["n_lat"]])
         #latvals2 = tf.expand_dims(latvals,1)
@@ -97,11 +99,11 @@ def calc_log_likelihood(DATA,W,MP,NP,n_ais_step = 1000,n_prior_samp = 500,n_hast
         #post_DG = lambda x: sess.run(-post_g_expression,{latvals:x})
 
         grad = [D1_g_expression,post_g_expression]
-        
+
         x,w = AIS.AIS(D1_f_expression,post_f_expression,D1_samp,NP["n_lat"],n_samp = n_prior_samp,n_AIS_step = n_ais_step,nhstep = n_hast_step,eps = eps,grad = grad,L = n_ham_step)
-                
+        
         output.append(w.mean())
-            
+        
         t2 = time.time()
         
         if TPT == 0:
@@ -111,6 +113,7 @@ def calc_log_likelihood(DATA,W,MP,NP,n_ais_step = 1000,n_prior_samp = 500,n_hast
             
         #        LOG.log("Log Lik:\t{}\tHours Left:\t{}".format(w.mean(),np.round((len(DATA) - k - 1)*TPT/(60*60),3)))
         print("Log Lik:\t{}\tHours Left:\t{}".format(w.mean(),np.round((len(DATA) - k - 1)*TPT/(60*60),3)))
+
     return np.array(output)
 
     
