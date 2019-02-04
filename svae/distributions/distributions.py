@@ -79,14 +79,14 @@ def make_SS(params):
     #Log[P] = Log[S g1 + (1-S)g2]
     
     def f(latvals):
-        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (latvals.shape[-1]/2)*np.log(2*PI*(s1**2))
-        D2 = -tf.reduce_sum((latvals/s2)**2,axis = -1)/2 - (latvals.shape[-1]/2)*np.log(2*PI*(s2**2))
+        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (int(latvals.shape)[-1]/2)*np.log(2*PI*(s1**2))
+        D2 = -tf.reduce_sum((latvals/s2)**2,axis = -1)/2 - (int(latvals.shape)[-1]/2)*np.log(2*PI*(s2**2))
 
         return tf.log(S) + D2 + tf.log(1 + (1. - S)*tf.exp(D1 - D2)/S)#T.log(S*T.exp(D2) + (1.-S)*T.exp(D1))
 
     def g(latvals):
-        D1 = -tf.reduce_sum((latvals/s1)**2,2)/2 - (latvals.shape[-1]/2)*np.log(2*PI*(s1**2))
-        D2 = -tf.reduce_sum((latvals/s2)**2,2)/2 - (latvals.shape[-1]/2)*np.log(2*PI*(s2**2))
+        D1 = -tf.reduce_sum((latvals/s1)**2,2)/2 - (int(latvals.shape)[-1]/2)*np.log(2*PI*(s1**2))
+        D2 = -tf.reduce_sum((latvals/s2)**2,2)/2 - (int(latvals.shape)[-1]/2)*np.log(2*PI*(s2**2))
 
         D1 = tf.expand_dims(D1,-1)
         D2 = tf.expand_dims(D2,-1)
@@ -122,15 +122,15 @@ def make_E_SS(params):
     S = params["S"]
     
     def f(latvals):
-        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (latvals.shape[-1]/2)*np.log(2*PI*(s1**2))
-        D2 = -tf.reduce_sum(tf.abs(latvals/s2),axis = -1) - (latvals.shape[-1])*np.log(2*s2)
+        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (int(latvals.shape)[-1]/2)*np.log(2*PI*(s1**2))
+        D2 = -tf.reduce_sum(tf.abs(latvals/s2),axis = -1) - (int(latvals.shape)[-1])*np.log(2*s2)
 
         #return T.log(S*T.exp(D2) + (1.-S)*T.exp(D1))
         return tf.log(S) + D2 + tf.log(1 + (1. - S)*tf.exp(D1 - D2)/S)
 
     def g(latvals):
-        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (latvals.shape[-1]/2)*np.log(2*PI*(s1**2))
-        D2 = -tf.reduce_sum(tf.abs(latvals/s2),axis = -1) - (latvals.shape[-1])*np.log(2*s2)
+        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (int(latvals.shape)[-1]/2)*np.log(2*PI*(s1**2))
+        D2 = -tf.reduce_sum(tf.abs(latvals/s2),axis = -1) - (int(latvals.shape)[-1])*np.log(2*s2)
 
         D1 = tf.expand_dims(D1,-1)
         D2 = tf.expand_dims(D2,-1)
@@ -166,14 +166,14 @@ def make_C_SS(params):
     S = params["S"]
 
     def f(latvals):
-        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (latvals.shape[-1]/2)*np.log(2*PI*(s1**2))
-        D2 = -tf.reduce_sum(tf.log(1. + (latvals/s2)**2),axis = -1) - latvals.shape[-1]*np.log(PI*s2)
+        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (int(latvals.shape)[-1]/2)*np.log(2*PI*(s1**2))
+        D2 = -tf.reduce_sum(tf.log(1. + (latvals/s2)**2),axis = -1) - int(latvals.shape)[-1]*np.log(PI*s2)
 
         return tf.log(S) + D2 + tf.log(1 + (1. - S)*tf.exp(D1 - D2)/S)#T.log(S*T.exp(D2) + (1.-S)*T.exp(D1))
 
     def g(latvals):
-        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (latvals.shape[-1]/2)*np.log(2*PI*(s1**2))
-        D2 = -tf.reduce_sum(tf.log(1. + (latvals/s2)**2),axis = -1) - latvals.shape[-1]*np.log(PI*s2)
+        D1 = -tf.reduce_sum((latvals/s1)**2,axis = -1)/2 - (int(latvals.shape)[-1]/2)*np.log(2*PI*(s1**2))
+        D2 = -tf.reduce_sum(tf.log(1. + (latvals/s2)**2),axis = -1) - int(latvals.shape)[-1]*np.log(PI*s2)
 
         D1 = tf.expand_dims(D1,-1)
         D2 = tf.expand_dims(D2,-1)
@@ -213,7 +213,7 @@ def make_E(parms):
     
 def make_C(parms):
     def f(latvals):
-        return -tf.reduce_sum(tf.log(1. + latvals**2),axis = -1) - latvals.shape[-1]*np.log(PI)
+        return -tf.reduce_sum(tf.log(1. + latvals**2),axis = -1) - int(latvals.shape[-1])*np.log(PI)
 
     def g(latvals):
         return -2*latvals/(1. + latvals**2)

@@ -17,6 +17,9 @@ def main(directory):
 
     params = utils.fetch_file(directory + "model_params")
 
+    for k in params.keys():
+        print("{}:\t{}".format(k,params[k]))
+    exit()
     netparams = prep(params)
 
     init = tf.global_variables_initializer()
@@ -39,7 +42,7 @@ def main(directory):
 
     sess.close()
 
-    AISout = np.array([calc_log_likelihood(netparams["testdat"][:10],W,params,netparams,n_ais_step = nstep,eps = .2,n_hast_step = 10,n_ham_step = 3) for nstep in range(10000,20000,1000)])
+    AISout = np.array([calc_log_likelihood(netparams["testdat"][:10],W,params,netparams,n_ais_step = nstep,eps = .2,n_hast_step = 10,n_ham_step = 3) for nstep in range(1000,20000,1000)])
 
     np.savetxt(directory + "/AIS_loglikelihood.csv",AISout)
     
