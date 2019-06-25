@@ -27,23 +27,26 @@ def split_by_batches(data,batch_size,shuffle = True):
     D = np.array([D[k:k + batch_size] for k in range(0,len(data)-batch_size,batch_size)])
     return D
 
-def run_training_loop(data,vdata,input_tensor,batch_size,train_op,loss_op,recerr_op,log,dirname,log_freq,n_grad_step,save_freq):
+def run_training_loop(data,vdata,input_tensor,pos_mean,batch_size,train_op,loss_op,recerr_op,log,dirname,log_freq,n_grad_step,save_freq):
 
     def var_loss(session,vdat,nbatch = 10):
         D = split_by_batches(vdat,batch_size,shuffle = False)
         loss = 0
         rerr = 0
         nb = 0
+        means = []
         for d in D:
             nb += 1
-            l,r = session.run([loss_op,recerr_op],{input_tensor:d})
+            l,r,m = session.run([loss_op,recerr_op,pos_mean],{input_tensor:d})
             loss += l
             rerr += r
+            means.append(m)
             if nb == nbatch:
                 break
         loss /= nbatch
         rerr /= nbatch
-        return loss,rerr
+        
+        return loss,rerr,np.concatenate(means,axis = 0)
     
     init = tf.global_variables_initializer()
     sess = tf.Session()
@@ -88,7 +91,7 @@ def run_training_loop(data,vdata,input_tensor,batch_size,train_op,loss_op,recerr
             loss = np.mean(t_loss_temp)
             recloss = np.mean(t_rec_temp)
 
-            vloss,vrec = var_loss(sess,vdata)
+            vloss,vrec,means = var_loss(sess,vdata)
             
             log.log([grad_step,loss,recloss,vloss,vrec,trem],PRINT = True)
                 
@@ -96,6 +99,7 @@ def run_training_loop(data,vdata,input_tensor,batch_size,train_op,loss_op,recerr
             t_rec_temp = []
 
         if grad_step % save_freq == 0:
+            util.dump_file(dirname + "/training_means_{}.pkl".format(grad_step),means)
             saver.save(sess,dirname + "/saved_params/saved_model_{}".format(str(grad_step)))
 
     saver.save(sess,dirname + "/saved_params/saved_model_{}".format("final"))
@@ -149,7 +153,7 @@ def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,n_grad_step,loss_
 
     train = adam.minimize(loss_exp)
 
-    run_training_loop(data,varif,images,n_batch,train,loss_exp,recon_err,LOG,dirname,log_freq,n_grad_step,param_save_freq)
+    run_training_loop(data,varif,images,netpar["mean"],n_batch,train,loss_exp,recon_err,LOG,dirname,log_freq,n_grad_step,param_save_freq)
 
 def prepare_network(params,old = False):
     
@@ -277,7 +281,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--patch_size",type = int,help = "Size of image patches to fit.",default = 12)
     parser.add_argument("--n_batch",type = int,help = "Size of batches to use in sgd.",default = 32)
-    parser.add_argument("--pca_frac",type = float,help = "Fraction of PCA components to use.",default = np.pi/4)
+    parser.add_argument("--pca_frac",type = float,help = "Fraction of PCA components to use.",default = 1)
     parser.add_argument("--learning_rate",type = float,help = "learning rate to use",default = .0001)
     parser.add_argument("--sigma",type = float,help = "Std. of noise.",default = np.float32(np.exp(-1.)))
 
@@ -289,7 +293,7 @@ if __name__ == "__main__":
     parser.add_argument("--param_save_freq",type = int,help = "number of gradient descent steps between saving parameters.",default = 50000)
     parser.add_argument("--log_freq",type = int,help = "number of gradient descent steps between log entries.",default = 100)
     parser.add_argument("--device",type = int,help = "Which GPU to use.",default = 0)
-    parser.add_argument("--PCA_truncation",type = str,help = "How to truncate fourier space: 'cut' - hard cutoff in PCA eigenvalue. 'smooth' - smooth decrease in eigenvalues (default)",default = "smooth")
+    parser.add_argument("--PCA_truncation",type = str,help = "How to truncate fourier space: 'cut' - hard cutoff in PCA eigenvalue. 'smooth' - smooth decrease in eigenvalues (default)",default = "cut")
     parser.add_argument("--dataset",type = str,help = "Which dataset to use (default: BSDS)",default = "BSDS")
 
                         

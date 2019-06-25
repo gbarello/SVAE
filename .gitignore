@@ -1,3 +1,5 @@
+previous_fits/*
+backup_datasets/*
 datasets/*
 eval_gen-master
 *.csv

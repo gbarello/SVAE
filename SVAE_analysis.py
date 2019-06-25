@@ -9,7 +9,7 @@ import svae.distributions.distributions as dist
 import os
 
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-os.environ["CUDA_VISIBLE_DEVICES"]= "0"
+os.environ["CUDA_VISIBLE_DEVICES"]= "1"
 
 EPS = 0#.00005
 
@@ -19,7 +19,6 @@ def main(directory):
 
     for k in params.keys():
         print("{}:\t{}".format(k,params[k]))
-    exit()
     netparams = prep(params)
 
     init = tf.global_variables_initializer()
@@ -36,12 +35,12 @@ def main(directory):
         W = sess.run(netparams["weights"])
 
         if params["pca_truncation"] == "cut":
-            np.savetxt(directory + "{}_weights.csv".format(c),netparams["PCA"].inverse_transform(W.transpose()))
+            np.savetxt(directory + "{}_weights.csv".format(c),W.transpose())#netparams["PCA"].inverse_transform(W.transpose()))
         elif params["pca_truncation"] == "smooth":
             np.savetxt(directory + "{}_weights.csv".format(c),W.transpose())
 
     sess.close()
-
+    exit()
     AISout = np.array([calc_log_likelihood(netparams["testdat"][:10],W,params,netparams,n_ais_step = nstep,eps = .2,n_hast_step = 10,n_ham_step = 3) for nstep in range(1000,20000,1000)])
 
     np.savetxt(directory + "/AIS_loglikelihood.csv",AISout)

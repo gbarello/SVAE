@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for loss in "cauch" "gauss" "spikenslab"
+for loss in "gauss" "spikenslab"
 do
     for ndim in 0 1 2
     do
