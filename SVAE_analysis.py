@@ -13,7 +13,14 @@ os.environ["CUDA_VISIBLE_DEVICES"]= "1"
 
 EPS = 0#.00005
 
-def main(directory):
+def main(directory,
+         compute_loglikelihood,
+         n_test_data,
+         n_ais_step,
+         eps,
+         n_hast_step,
+         n_ham_step,
+         n_prior_samp):
 
     params = utils.fetch_file(directory + "model_params")
 
@@ -28,22 +35,24 @@ def main(directory):
     saver = tf.train.Saver()
 
     CP = read_ckpt_file(directory + "saved_params/checkpoint")
-    
+    Wcp = []
     for c in CP:
+        print("Saving weights for cp-file {}".format(c))
         saver.restore(sess,directory + "saved_params/" + c)
 
         W = sess.run(netparams["weights"])
-
+        Wcp.append(W)
         if params["pca_truncation"] == "cut":
             np.savetxt(directory + "{}_weights.csv".format(c),W.transpose())#netparams["PCA"].inverse_transform(W.transpose()))
         elif params["pca_truncation"] == "smooth":
             np.savetxt(directory + "{}_weights.csv".format(c),W.transpose())
 
     sess.close()
-    exit()
-    AISout = np.array([calc_log_likelihood(netparams["testdat"][:10],W,params,netparams,n_ais_step = nstep,eps = .2,n_hast_step = 10,n_ham_step = 3) for nstep in range(1000,20000,1000)])
+    if compute_loglikelihood:
+        print("Computing loglikelihood.")
+        AISout = np.array([calc_log_likelihood(netparams["testdat"][:n_test_data],w,params,netparams,n_prior_samp = n_prior_samp,n_ais_step = n_ais_step,eps = eps,n_hast_step=n_hast_step,n_ham_step = n_ham_step) for w in Wcp])
 
-    np.savetxt(directory + "/AIS_loglikelihood.csv",AISout)
+        np.savetxt(directory + "/AIS_loglikelihood.csv",AISout)
     
 def read_ckpt_file(f):
     F = open(f,"r")
@@ -120,4 +129,21 @@ def calc_log_likelihood(DATA,W,MP,NP,n_ais_step = 10000,n_prior_samp = 50,n_hast
 
     
 if __name__ == "__main__":
-    main(sys.argv[1])
+    import argparse
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("directory",help = "Relative path to directory containing the trained model you'd like to analyze.")
+    
+    parser.add_argument("--compute_loglikelihood",action="store_true",help = "Run Annealed Importance Sampling to compute the loglikelihood.")
+    parser.add_argument("--n_test_data",default = 50,help = "number of test data samples to use for loglikelihood.")
+    parser.add_argument("--n_ais_step",default = 10000,help = "number of AIS steps to take.")
+    parser.add_argument("--eps",default = .1,help = "epsilon parameter for AIS.")
+    parser.add_argument("--n_hast_step",default = 10,help = "number of MCMC steps to take for AIS.")
+    parser.add_argument("--n_ham_step",default = 3,help = "number of steps to take for hamiltonian monte-carlo.")
+    parser.add_argument("--n_prior_samp",default = 50,help = "number of samples to use for AIS.")
+
+    args = vars(parser.parse_args())
+
+    #arg: loss, dataset, decoder (deep or shallow)
+
+    main(**args)
