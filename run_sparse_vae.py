@@ -27,7 +27,7 @@ def split_by_batches(data,batch_size,shuffle = True):
     D = np.array([D[k:k + batch_size] for k in range(0,len(data)-batch_size,batch_size)])
     return D
 
-def run_training_loop(data,vdata,input_tensor,pos_mean,batch_size,train_op,loss_op,recerr_op,log,dirname,log_freq,n_grad_step,save_freq):
+def run_training_loop(data,vdata,input_tensor,pos_mean,batch_size,train_op,loss_op,recerr_op,log,dirname,log_freq,n_grad_step,save_freq,update_LR):
 
     def var_loss(session,vdat,nbatch = 10):
         D = split_by_batches(vdat,batch_size,shuffle = False)
@@ -58,7 +58,7 @@ def run_training_loop(data,vdata,input_tensor,pos_mean,batch_size,train_op,loss_
     av_time = -1
     efrac = .9
 
-    log.log(["grad_step","loss","recloss","var_loss","var_rec","time_rem"],PRINT = True)
+    log.log(["grad_step","loss","recloss","var_loss","var_rec","learning_rate","time_rem"],PRINT = True)
 
     t_loss_temp = []
     t_rec_temp = []
@@ -71,7 +71,7 @@ def run_training_loop(data,vdata,input_tensor,pos_mean,batch_size,train_op,loss_
             
         batch = data[np.random.choice(np.arange(len(data)),batch_size)]
         
-        _,loss,recloss = sess.run([train_op,loss_op,recerr_op],{input_tensor:batch})
+        _,loss,recloss,newLR = sess.run([train_op,loss_op,recerr_op,update_LR],{input_tensor:batch}) # Run a session to get the loss/reconstruction error
         
         t_loss_temp.append(loss)
         t_rec_temp.append(recloss)
@@ -93,7 +93,7 @@ def run_training_loop(data,vdata,input_tensor,pos_mean,batch_size,train_op,loss_
 
             vloss,vrec,means = var_loss(sess,vdata)
             
-            log.log([grad_step,loss,recloss,vloss,vrec,trem],PRINT = True)
+            log.log([grad_step,loss,recloss,vloss,vrec,newLR,trem],PRINT = True) #
                 
             t_loss_temp = []
             t_rec_temp = []
@@ -107,7 +107,7 @@ def run_training_loop(data,vdata,input_tensor,pos_mean,batch_size,train_op,loss_
 
     
 
-def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,n_grad_step,loss_type,n_gauss_dim,n_lat_samp,seed,param_save_freq,log_freq,sigma,s1,s2,S,device,PCA_truncation,dataset):
+def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,final_learning_rate,n_grad_step,loss_type,n_gauss_dim,n_lat_samp,seed,param_save_freq,log_freq,sigma,s1,s2,S,device,PCA_truncation,dataset):
 
     os.environ["CUDA_VISIBLE_DEVICES"]=str(device)
     np.random.seed(seed)
@@ -121,6 +121,7 @@ def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,n_grad_step,loss_
         "pca_frac":pca_frac,
         "overcomplete":overcomplete,
         "learning_rate":np.float32(learning_rate),
+        "final_learning_rate":np.float32(final_learning_rate),
         "pca_truncation":PCA_truncation,
         "n_grad_step":n_grad_step,
         "loss_type":loss_type,
@@ -147,13 +148,18 @@ def run(patch_size,n_batch,pca_frac,overcomplete,learning_rate,n_grad_step,loss_
     data = netpar["data"]
     varif = netpar["vardat"]
 
-    LR = tf.Variable(np.float32(learning_rate),trainable = False)
-
-    adam = tf.train.AdamOptimizer(learning_rate = LR)
-
-    train = adam.minimize(loss_exp)
-
-    run_training_loop(data,varif,images,netpar["mean"],n_batch,train,loss_exp,recon_err,LOG,dirname,log_freq,n_grad_step,param_save_freq)
+    #get factor to multiply LR by:
+    if final_learning_rate < learning_rate:
+        LR_factor = np.float32(np.exp(-np.log(learning_rate/final_learning_rate)/n_grad_step))
+    else:
+        print("Final LR must be lower than initial LR! Overriding with LR_factor = 1")
+        LR_factor = np.float32(1)
+        
+    LR    = tf.Variable(np.float32(learning_rate),trainable = False)# 
+    adam  = tf.train.AdamOptimizer(learning_rate = LR)              # Set up the Adam optimization 
+    train = adam.minimize(loss_exp)                                 # Run training
+    update_LR = tf.assign(LR,LR*LR_factor)
+    run_training_loop(data,varif,images,netpar["mean"],n_batch,train,loss_exp,recon_err,LOG,dirname,log_freq,n_grad_step,param_save_freq,update_LR)
 
 def prepare_network(params,old = False):
     
@@ -282,10 +288,11 @@ if __name__ == "__main__":
     parser.add_argument("--patch_size",type = int,help = "Size of image patches to fit.",default = 12)
     parser.add_argument("--n_batch",type = int,help = "Size of batches to use in sgd.",default = 32)
     parser.add_argument("--pca_frac",type = float,help = "Fraction of PCA components to use.",default = 1)
-    parser.add_argument("--learning_rate",type = float,help = "learning rate to use",default = .0001)
+    parser.add_argument("--learning_rate",type = float,help = "learning rate to use",default = .001)
+    parser.add_argument("--final_learning_rate",type = float,help = "learning rate to use",default = .00001)
     parser.add_argument("--sigma",type = float,help = "Std. of noise.",default = np.float32(np.exp(-1.)))
 
-    parser.add_argument("--n_gauss_dim",type = int,help = "Rank of the non-orthogonal transformation matrix of an MVG posterior.",default = 1)
+    parser.add_argument("--n_gauss_dim",type = int,help = "Rank of the non-orthogonal transformation matrix of an MVG posterior.",default = 0)
     parser.add_argument("--n_lat_samp",type = int,help = "number of samples to draw from the variational posterior during training.",default = 1)
     parser.add_argument("--seed",type = int,help = "random seed.",default=1)
 
